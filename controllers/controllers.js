@@ -10,27 +10,61 @@ class UserOperations {
         console.log('Message: ' + msg);
     }
 
-    dashboard(req, res) {
-        /**
-         * if user not logged in, redirect to '/login'
-         */
-        res.send("Dashboard");
+    index(req, res)
+    {
+        let flag = false;
+        //redirecting to the dashboard if the user didn't logout
+        if(req.headers.cookie){
+            let access_token = req.headers.cookie
+            access_token = access_token.split("access_token=")
+            access_token = access_token[1];
+            jwt.verify(access_token, config.TOKEN_KEY, (err, user) => {
+                if(err)
+                    return err;
+                res.redirect('dashboard')
+            });
+        }else{
+            //otherwise redirect to the login page
+            res.render('login', {flag})
+        }
+    }
+
+    dashboard(req, res) 
+    {
+        const {user} = req.body.user
+        res.render('dashboard', {user})//send the data to the ejs file
     }
 
     async login(req, res) {
         /// Fetching user info
         let { email, password } = req.body;
 
-        /// creating a jwt token for the login 
-        /// and store it in the cookies
-        const token = jwt.sign({ email, password }, config.TOKEN_KEY, { expiresIn: "24h" });
-        res.cookie("access_token", token, { httpOnly: true });
+        let flag = false;
+        const user = await User.findOne({ email })
+        if (user && (await bcrypt.compare(password, user.passwordHashed)))
+        {
+            /// creating a jwt token for the login 
+            /// and store it in the cookies
+            const token = jwt.sign({ email, password }, config.TOKEN_KEY, { expiresIn: "24h" });
+            res.cookie("access_token", token, { httpOnly: true });
 
-        console.log(req.body);
-        res.send(req.body);
+            console.log(req.body);
+            res.redirect('/')
+        }else
+        {
+            flag = true;
+            res.render('login', {flag});
+        }
+
     }
 
-    async signup(req, res) {
+    signup(req, res)
+    {
+        res.render('signup')
+    }
+
+    async create(req, res) {
+        
         let { name, email, password, phoneNumber } = req.body;
 
         const passwordHashed = await bcrypt.hash(password, 10);
@@ -68,6 +102,12 @@ class UserOperations {
         } catch (error) {
             res.json(error);
         }
+    }
+
+    async logout(req, res)
+    {
+        res.clearCookie("access_token")
+        res.redirect('/')
     }
 }
 
